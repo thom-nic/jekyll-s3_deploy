@@ -2,7 +2,7 @@ require 'yaml'
 require 'net/http'
 
 # Ping Google and Bing web crawlers that the site has changed
-class JekyllS3::PingCommand < Jekyll::Command
+class Jekyll::S3Deploy::PingCommand < Jekyll::Command
   class << self
     def init_with_program prog
             prog.command(:ping) do |c|

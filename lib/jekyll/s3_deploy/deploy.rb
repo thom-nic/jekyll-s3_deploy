@@ -12,8 +12,8 @@ S3_CONFIG_FILE = "_config_s3.yml" # location of file with S3 access key, private
 # doesn't really work well. Most files get re-generated even if they haven't
 # changed.
 # See http://docs.aws.amazon.com/sdkforruby/api/Aws/S3.html
-class JekyllS3::DeployCommand < Jekyll::Command
-  class << self    
+class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
+  class << self
     def init_with_program prog
       prog.command(:deploy_s3) do |c|
         c.syntax "deploy_s3 [options]"
@@ -30,7 +30,7 @@ class JekyllS3::DeployCommand < Jekyll::Command
 
     def s3_upload file_glob, force
       config = YAML.load File.open '_config.yml'
-      
+
       begin
         s3_config = YAML.load File.open S3_CONFIG_FILE
         Aws.config.update(
@@ -39,7 +39,7 @@ class JekyllS3::DeployCommand < Jekyll::Command
             s3_config['secret_key']
           ),
           region: config['s3']['region'] || 'us-east-1',
-        )        
+        )
       rescue Exception => e
         puts "Error: #{e}"
         puts "Please verify your AWS credentials in '#{S3_CONFIG_FILE}'"

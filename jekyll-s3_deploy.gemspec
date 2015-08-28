@@ -1,16 +1,16 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'jekyll_s3/version'
+require 'jekyll/s3_deploy/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "jekyll-s3-deploy"
-  spec.version       = JekyllS3::VERSION
+  spec.name          = "jekyll-s3_deploy"
+  spec.version       = Jekyll::S3Deploy::VERSION
   spec.authors       = ["Thom Nichols"]
   spec.email         = ["thom.nichols@voltserver.com"]
   spec.summary       = %q{Deploy your Jekyll site to Amazon S3.}
   spec.description   = %q{This is a Jekyll command that will upload your site to Amazon S3}
-  spec.homepage      = "https://github.com/thom_nic/jekyll-s3-deploy"
+  spec.homepage      = "https://github.com/thom_nic/jekyll-s3_deploy"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")

@@ -1,9 +1,9 @@
-# Jekyll S3 Deploy
+# Jekyll S3 Deploy Command
 
 Publish your Jekyll site to Amazon S3.  This is a pure-ruby solution that uses
 on `aws-sdk`, as opposed to `s3_website` which relies on a Java JAR.
 
-Use [these instructions](http://docs.amazonwebservices.com/AmazonS3/latest/dev/WebsiteHosting.html)
+Follow [these instructions](http://docs.amazonwebservices.com/AmazonS3/latest/dev/WebsiteHosting.html)
 to setup your Amazon AWS bucket as appropriate.  You also probably want to
 [setup your own domain](http://docs.aws.amazon.com/AmazonS3/latest/dev/website-hosting-custom-domain-walkthrough.html) although this process has no bearing on the actual upload/
 serving files from S3.
@@ -14,7 +14,7 @@ Add this line to your Jekyll project's Gemfile:
 
 ```ruby
 group :jekyll_plugins do
-  gem 'jekyll_s3', github: 'thom_nic/jekyll_s3_deploy'
+  gem 'jekyll-s3_deploy', github: 'thom-nic/jekyll-s3_deploy'
 end
 ```
 
