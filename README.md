@@ -31,7 +31,13 @@ And add the following to `_config.yml`
 s3:
   bucket: mysite.com
   region: us-east-1   # optional, this is the default value
-  cache_control: public, max-age=3600 # optional, default is nil
+  cache_control:      # Cache-Control headers (optional)
+    'assets/*' : max-age=3600
+    '*.html' : max-age=300
+  deflate:            # what assets should be Content-Encoded (optional)
+    - '*.html'
+    - '*.css'
+    - '*.svg'
 ```
 
 And then execute:
@@ -40,9 +46,13 @@ And then execute:
 jekyll deploy_s3
 ```
 
-If you use the [Jekyll sitemap plugin](), this project also contains a `ping`
-command to notify Google and Bing that your site has been updated.  Just run
-`jekyll ping`
+If you use the [Jekyll sitemap plugin](https://github.com/jekyll/jekyll-sitemap),
+this project also contains a `ping` command to notify Google and Bing web
+crawlers that your site has been updated.  Just run `jekyll ping`
+
+### Options
+
+`-f` - Force upload everything under `_site`
 
 
 ### More details on setting up your AWS credentials...
