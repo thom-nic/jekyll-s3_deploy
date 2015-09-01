@@ -5,13 +5,21 @@
 require 'aws-sdk'
 require 'mime/types'
 require 'yaml'
+require 'zlib'
 
 S3_CONFIG_FILE = "_config_s3.yml" # location of file with S3 access key, private key, bucket name
 
-# Use deploy_s3[.*html] to upload only HTML files since the timestamp matching
-# doesn't really work well. Most files get re-generated even if they haven't
-# changed.
-# See http://docs.aws.amazon.com/sdkforruby/api/Aws/S3.html
+# Use `bin/jekyll deploy_s3` to upload any files that are newer locally than
+# on S3.  Add `-f` to force upload.  
+#
+# Your S3 configuration should look like:
+# ```yaml
+# s3:
+#   bucket: mysite.com
+#   cache_control:
+#   
+#
+# This uses http://docs.aws.amazon.com/sdkforruby/api/Aws/S3.html
 class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
   class << self
     def init_with_program prog
@@ -41,22 +49,24 @@ class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
           region: config['s3']['region'] || 'us-east-1',
         )
       rescue Exception => e
-        puts "Error: #{e}"
-        puts "Please verify your AWS credentials in '#{S3_CONFIG_FILE}'"
+        Jekyll.logger.error "Error: #{e}"
+        Jekyll.logger.error "Please verify your AWS credentials in '#{S3_CONFIG_FILE}'"
         return
       end
 
       public_dir = config['destination'] || '_site'
-      file_glob ||= '.*'
+      file_glob ||= '*'
 
       bucket = config['s3']['bucket']
+      cache_control_map = config['s3']['cache_control'] || {}
+      encoding_globs = config['s3']['deflate'] || []
       s3 = Aws::S3::Client.new
 
       Dir.glob("#{public_dir}/**/*") do |f|
 
         next if File.directory? f
         f_name = f.sub "#{public_dir}/", ""
-        next unless f_name.match( file_glob ) != nil
+        next unless File.fnmatch file_glob, f_name
 
         # compare atime for each file, only sync changes
         local_modified = Time.at File.stat( f ).mtime
@@ -67,17 +77,51 @@ class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
                    end
 
         if force or not existing or existing.last_modified < local_modified
-          puts "Pushing #{f_name} to #{bucket}..."
-          s3.put_object key: f_name,
-                        bucket: bucket,
-                        body: File.new(f,'r'),
-                        acl: "public-read",
-                        cache_control: config['s3']['cache_control'],
-                        content_type: MIME::Types.type_for(f_name).first.content_type
+          Jekyll.logger.info "Pushing #{f_name} to #{bucket}..."
+          File.open f, 'r' do |stream|
+
+            stream, encoding = maybe_encode encoding_globs, f, stream
+            cache_header = get_cache_header cache_control_map, f
+            content_type_header = MIME::Types.type_for(f_name).first.content_type
+            
+            Jekyll.logger.debug "  Content-Encoding: #{encoding}" if encoding
+            Jekyll.logger.debug "  Cache-Control: #{cache_header}" if cache_header
+
+            s3.put_object key: f_name,
+                          bucket: bucket,
+                          body: stream,
+                          acl: "public-read",
+                          content_encoding: encoding,
+                          cache_control: cache_header,
+                          content_type: content_type_header
+          end
         end
       end
     rescue Aws::Errors::ServiceError => e
-      puts "AWS error: #{e.class}"
+      Jekyll.logger.error "AWS error: #{e.class}"
+    end
+
+    protected
+
+    def maybe_encode globs, filename, raw_stream
+      if globs.any? { |glob| File.fnmatch glob, filename }
+        return Zlib::Deflate.deflate( raw_stream.read ), 'deflate'
+      end
+      return raw_stream, nil
+    end
+
+    # given a map of file globs to cache_control header values like
+    # ```ruby
+    # {
+    #   '*.css' => 'public, expires=300',
+    #   'assets/img/*' => 'public, expires=3600'
+    # }
+    # ```
+    # this will return the first one that matches.
+    def get_cache_header cache_map, filename
+      cache_map.each do |glob,val|
+        return val if File.fnmatch glob, filename
+      end
     end
   end
 end
