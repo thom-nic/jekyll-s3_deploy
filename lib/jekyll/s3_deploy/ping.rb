@@ -19,14 +19,14 @@ class Jekyll::S3Deploy::PingCommand < Jekyll::Command
       config = YAML.load File.open '_config.yml'
       sitemap_url = URI.escape "#{config['url']}#{config['baseurl']}/sitemap.xml"
 
-      puts "Notifying web crawlers of updated sitemap at #{sitemap_url}"
-      puts "* Pinging Google sitemap..."
+      Jekyll.logger.info "Notifying web crawlers of updated sitemap at #{sitemap_url}"
+      Jekyll.logger.info "* Pinging Google sitemap..."
       resp = Net::HTTP.get_response 'www.google.com', "/webmasters/tools/ping?sitemap=#{sitemap_url}"
-      puts "Error! #{resp.code} : #{resp.message}" if resp.code.to_i != 200
-      puts '* Pinging Bing sitemap...'
+      Jekyll.logger.error "Error! #{resp.code} : #{resp.message}" if resp.code.to_i != 200
+      Jekyll.logger.info '* Pinging Bing sitemap...'
       resp = Net::HTTP.get_response 'www.bing.com',  "/webmaster/ping.aspx?siteMap=#{sitemap_url}"
-      puts "Error! #{resp.code} : #{resp.message}" if resp.code.to_i != 200
-      puts '... Done.'
+      Jekyll.logger.error "Error! #{resp.code} : #{resp.message}" if resp.code.to_i != 200
+      Jekyll.logger.info 'Done!'
     end
   end
 end
