@@ -2,6 +2,8 @@
 # http://docs.amazonwebservices.com/AmazonS3/latest/dev/WebsiteHosting.html
 # Customize values in _config_s3.yml as appropriate.
 
+require 'stringio'
+require 'pathname'
 require 'aws-sdk'
 require 'mime/types'
 require 'yaml'
@@ -10,14 +12,14 @@ require 'zlib'
 S3_CONFIG_FILE = "_config_s3.yml" # location of file with S3 access key, private key, bucket name
 
 # Use `bin/jekyll deploy_s3` to upload any files that are newer locally than
-# on S3.  Add `-f` to force upload.  
+# on S3.  Add `-f` to force upload.
 #
 # Your S3 configuration should look like:
 # ```yaml
 # s3:
 #   bucket: mysite.com
 #   cache_control:
-#   
+#
 #
 # This uses http://docs.aws.amazon.com/sdkforruby/api/Aws/S3.html
 class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
@@ -38,15 +40,16 @@ class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
 
     def s3_upload file_glob, force
       config = YAML.load File.open '_config.yml'
+      s3_config = config['s3']
 
       begin
-        s3_config = YAML.load File.open S3_CONFIG_FILE
+        s3_api_config = YAML.load File.open S3_CONFIG_FILE
         Aws.config.update(
           credentials: Aws::Credentials.new(
-            s3_config['access_key'],
-            s3_config['secret_key']
+            s3_api_config['access_key'],
+            s3_api_config['secret_key']
           ),
-          region: config['s3']['region'] || 'us-east-1',
+          region: s3_config['region'] || 'us-east-1',
         )
       rescue Exception => e
         Jekyll.logger.error "Error: #{e}"
@@ -57,9 +60,11 @@ class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
       public_dir = config['destination'] || '_site'
       file_glob ||= '*'
 
-      bucket = config['s3']['bucket']
-      cache_control_map = config['s3']['cache_control'] || {}
-      encoding_globs = config['s3']['deflate'] || []
+      bucket = s3_config['bucket']
+      cache_control_map = s3_config['cache_control'] || {}
+      encoding_globs = s3_config['gzip'] || []
+      mime_overrides = s3_config['mime_overrides'] || []
+
       s3 = Aws::S3::Client.new
 
       Dir.glob("#{public_dir}/**/*") do |f|
@@ -78,12 +83,13 @@ class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
 
         if force or not existing or existing.last_modified < local_modified
           Jekyll.logger.info "Pushing #{f_name} to #{bucket}..."
-          File.open f, 'r' do |stream|
+          File.open f, 'rb' do |stream|
 
             stream, encoding = maybe_encode encoding_globs, f, stream
             cache_header = get_cache_header cache_control_map, f
-            content_type_header = MIME::Types.type_for(f_name).first.content_type
-            
+            content_type_header = get_content_type_header f_name, mime_overrides
+
+            Jekyll.logger.debug "  Content-Type: #{content_type_header}"
             Jekyll.logger.debug "  Content-Encoding: #{encoding}" if encoding
             Jekyll.logger.debug "  Cache-Control: #{cache_header}" if cache_header
 
@@ -103,9 +109,23 @@ class Jekyll::S3Deploy::DeployCommand < Jekyll::Command
 
     protected
 
+    def get_content_type_header f_name, overrides={}
+      header = overrides[Pathname(f_name).extname]
+
+      if header.nil?
+        header = (MIME::Types.type_for(f_name) || []).first
+        header = header.content_type unless header.nil?
+      end
+      header
+    end
+
     def maybe_encode globs, filename, raw_stream
       if globs.any? { |glob| File.fnmatch glob, filename }
-        return Zlib::Deflate.deflate( raw_stream.read ), 'deflate'
+        zipped_output = StringIO.new "", 'wb'
+        Zlib::GzipWriter.wrap zipped_output do |gz|
+          gz.write raw_stream.read
+        end
+        return StringIO.new( zipped_output.string, 'rb'), 'gzip'
       end
       return raw_stream, nil
     end
